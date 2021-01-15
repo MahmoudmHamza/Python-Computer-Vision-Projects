@@ -1,14 +1,13 @@
-# sbe404-cvtoolbox-ver1-group_4
+# Computer Vision Toolbox
 
-## CV Toolbox Task Report
+## Overview
 
-Overview
 this report includes the summary of image processing filters implemented using python 3.6 such as
 - Spatial domain filtering
 - Frequency domain filtering
 - Hough Transform
 
-as shown in the following user interface made using PyQt5 library
+The tool box's UI (User Interface) was implemented using PyQt5 library.
 
 ![UI](https://user-images.githubusercontent.com/44654878/56047144-18b2ac00-5d45-11e9-9779-be28a965f72e.PNG)
 
@@ -133,10 +132,10 @@ The Hough transform is a technique which can be used to isolate features of a pa
 
 ### Acknowledgment
 
-@AbdelrahmanARamzy Helped us with some issues in UI part
+A huge shoutout for @AbdelrahmanARamzy who helped us tackling some issues in UI part.
 
 ### References
 
-- This [link](https://towardsdatascience.com/canny-edge-detection-step-by-step-in-python-computer-vision-b49c3a2d8123) Helped me in the implementation of canny edge detector
-- This [link](https://www.codingame.com/playgrounds/38470/how-to-detect-circles-in-images) helped in making hough circle
-- this [link](https://www.youtube.com/watch?v=YxZUnJ_Ok2w&list=PLh6SAYydrIpctChfPFBlopqw-TGjwWf_8&index=8) helped in histogram equalization and matching part
+- This [link](https://towardsdatascience.com/canny-edge-detection-step-by-step-in-python-computer-vision-b49c3a2d8123) helped in the implementation of canny edge detector.
+- This [link](https://www.codingame.com/playgrounds/38470/how-to-detect-circles-in-images) helped in the implementation of hough circle.
+- We used this [link](https://www.youtube.com/watch?v=YxZUnJ_Ok2w&list=PLh6SAYydrIpctChfPFBlopqw-TGjwWf_8&index=8) in histogram equalization and matching implementation.
