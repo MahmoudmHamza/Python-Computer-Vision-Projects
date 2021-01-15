@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import convolve
 from scipy.misc import imsave
-import matplotlib.image as mpimg
+import matplotlib.image as mpimage
 import matplotlib.colors as col
 from scipy import  fftpack
 from PyQt5.uic import loadUi
@@ -27,30 +27,32 @@ import skimage
 import skimage.filters
 import scipy.interpolate
 
-
-def rgb2gray(image):
+# Convert image from RGB scale into gray scale
+def Rgb2Gray(image):
     return np.dot(image[..., :3], [0.299, 0.587, 0.114])
 
-def histogram(img):
-    height = img.shape[0]
-    width = img.shape[1]
-    hist = np.zeros((256))
+# Returns image's Histogram
+def Histogram(image):
+    height = image.shape[0]
+    width = image.shape[1]
+    imageHistogram = np.zeros((256))
     for i in np.arange(height):
         for j in np.arange(width):
-            a = img.item(i, j)
-            hist[int(a)] += 1
+            a = image.item(i, j)
+            imageHistogram[int(a)] += 1
 
-    return hist
+    return imageHistogram
 
-def cumulative_histogram(hist):
-    cum_hist = hist.copy()
+# Returns image's cumulative Histogram
+def ApplyCumulativeHistogram(histogram):
+    cumulativeHistogram = histogram.copy()
 
     for i in np.arange(1, 256):
-        cum_hist[i] = cum_hist[i - 1] + cum_hist[i]
+        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + cumulativeHistogram[i]
 
-    return cum_hist
+    return cumulativeHistogram
 
-def OpenedFile(fileName):
+def GetFileName(fileName):
     i = len(fileName)-1
     j = -1
     x = 1
@@ -61,90 +63,88 @@ def OpenedFile(fileName):
                 i -= 1
             else:
                 x = 0
-    File_Names = np.zeros(j+1)
+    fileNames = np.zeros(j+1)
 
     # Convert from Float to a list of strings
-    File_Name = ["%.2f" % number for number in File_Names]
+    fileName = ["%.2f" % number for number in fileNames]
     for k in range(0, j+1):
-        File_Name[k] = fileName[len(fileName)-1+k-j]  # List of Strings
+        fileName[k] = fileName[len(fileName)-1+k-j]  # List of Strings
     # Convert list of strings to a string
-    FileName = ''.join(File_Name)  # String
+    FileName = ''.join(fileName)  # String
     return FileName
 
-
-def df(img):  # to make a histogram (count distribution frequency)
-    # values = [0]*256
+# to make a Histogram (count distribution frequency)
+def ApplyDistributionFrequency(image):  
     values = np.zeros((256))
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            values[int(img[i, j])] += 1
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            values[int(image[i, j])] += 1
     return values
 
-
-def gaussian_kernel(size, sigma=1):
+# Applies gaussian kernel of the given size and sigma
+def ApplyGaussianKernel(size, sigma = 1):
     size = int(size) // 2
     x, y = np.mgrid[-size:size+1, -size:size+1]
     normal = 1 / (2.0 * np.pi * sigma**2)
     g =  np.exp(-((x**2 + y**2) / (2.0*sigma**2))) * normal
     return g
    
-
-def cdf(hist):  # cumulative distribution frequency
-    cdf = [0] * len(hist)  # len(hist) is 256
-    cdf[0] = hist[0]
+# cumulative distribution frequency
+def ApplyCumulativeDistributionFrequency(hist):  
+    distributionFrequency = [0] * len(hist)  # len(hist) is 256
+    distributionFrequency[0] = hist[0]
     for i in range(1, len(hist)):
-        cdf[i] = cdf[i - 1] + hist[i]
-    # Now we normalize the histogram
-    cdf = [ele * 255 / cdf[-1] for ele in cdf]  # What your function h was doing before
-    return cdf
+        distributionFrequency[i] = distributionFrequency[i - 1] + hist[i]
+    # Now we normalize the Histogram
+    distributionFrequency = [ele * 255 / distributionFrequency[-1] for ele in distributionFrequency]
+    return distributionFrequency
 
-
+# use linear interpolation of cumulative distribution frequency to find new pixel values. Scipy alternative exists
 def equalize_image(image):
-    my_cdf = cdf(df(img))
-    # use linear interpolation of cdf to find new pixel values. Scipy alternative exists
+    myDistributionFrequency = ApplyCumulativeDistributionFrequency(ApplyDistributionFrequency(image))
 
-    image_equalized = np.interp(image, range(0, 256), my_cdf)
-    return image_equalized
+    equalizedImage = np.interp(image, range(0, 256), myDistributionFrequency)
+    return equalizedImage
 
 
-def gauss_kernel( kernlen , std ):
-    """Returns a 2D Gaussian kernel array."""
-    gkern1d = signal.gaussian(kernlen, std=std).reshape(kernlen, 1)
+def GuassKernel(kernelLength, std):
+    gkern1d = signal.gaussian(kernelLength, std = std).reshape(kernelLength, 1)
     gkern2d = np.outer(gkern1d, gkern1d)
     return gkern2d
 
-
-def box_filter(w):
+# applies box filter to the image
+def ApplyBoxFilter(w):
     return np.ones((w,w)) / (w*w)
 
-
-def extractValueChannel(image):
+# Check if it has three channels or not
+def ExtractValueChannel(image):
     try:
-        # Check if it has three channels or not
         np.size(image, 2)
     except:
         return image
     hsvImage = col.rgb_to_hsv(image)
     return hsvImage[..., 2]
 
-
-def generateFilter(image, w, h, filterType):
+# Generates filtered image based on type
+def GenerateFilter(image, w, h, filterType):
     if w > 0.5 or h > 0.5:
         print("w and h must be < 0.5")
         exit()
     m = np.size(image, 0)
     n = np.size(image, 1)
-    LPF = np.zeros((m, n))
-    HPF = np.ones((m, n))
+
     xi = np.round((0.5 - w / 2) * m)
     xf = np.round((0.5 + w / 2) * m)
     yi = np.round((0.5 - h / 2) * n)
     yf = np.round((0.5 + h / 2) * n)
-    LPF[int(xi):int(xf), int(yi):int(yf)] = 1
-    HPF[int(xi):int(xf), int(yi):int(yf)] = 0
+
     if filterType == "LPF":
+        LPF[int(xi):int(xf), int(yi):int(yf)] = 1
+        LPF = np.zeros((m, n))
         return LPF
     elif filterType == "HPF":
+        HPF = np.ones((m, n))
+        HPF[int(xi):int(xf), int(yi):int(yf)] = 0
         return HPF
     else:
         print("Only Ideal LPF and HPF are supported")
@@ -167,16 +167,16 @@ Sobel_ker_Gy = np.array([[1, 2, 1],
                         [0, 0, 0],
                         [-1, -2, -1]])
 
-Lablacian_ker= np.array([[0, 1, 0],
+Laplacian_ker= np.array([[0, 1, 0],
                         [1, -4, 1],
                         [0, 1, 0]])
 
-##Sharpening
-def sharp_filter(u):
-    sharp_ker = np.array([[0, -1, 0],
+# Sharpening
+def SharpeningFilter(u):
+    sharpKernel = np.array([[0, -1, 0],
                          [-1, u, -1],
                          [0, -1, 0]])
-    return sharp_ker
+    return sharpKernel
 
 
 def load(self):
@@ -186,20 +186,20 @@ def load(self):
         fileName = QFileDialog.getOpenFileName(self, 'Open file', '/home')[0]  # , '*.csv'
         # To get the file name itself without the path
 
-        global file_name
-        file_name = OpenedFile(fileName)
+        global fileName
+        fileName = GetFileName(fileName)
         # make sure the extension is correct
-        if (file_name[len(file_name) - 1] != 'g' and file_name[len(file_name) - 2] != 'p' and
-                file_name[len(file_name) - 3] != 'j'):
+        if (fileName[len(fileName) - 1] != 'g' and fileName[len(fileName) - 2] != 'p' and
+                fileName[len(fileName) - 3] != 'j'):
             QMessageBox.about(self, "Error!", "Please choose a .jpg file")
             return
 
         # Global to be moved or used between functions
-        global image_gr, img, im
-        img = ndimage.imread(file_name)
-        im = Image.open(file_name)
+        global grayScaleImage, image, im
+        image = ndimage.imread(fileName)
+        im = Image.open(fileName)
         width, height = im.size
-        image_gr = rgb2gray(img)
+        grayScaleImage = Rgb2Gray(image)
         
 
 global x,y
@@ -210,27 +210,11 @@ clicks = []
 
 def on_mouse(event, x, y, flags, params):
     if event == cv2.EVENT_LBUTTONDOWN:
-        print ('Seed: ' + str(x) + ', ' + str(y), img[y,x])
+        print ('Seed: ' + str(x) + ', ' + str(y), image[y,x])
         clicks.append((y,x))
+        
 
-
-'''def contour_draw(event, x, y, flags, params):
-        global Contour_flag, points
-        if event == cv2.EVENT_LBUTTONDOWN:
-            if x in range(img.shape[0]) and y in range(img.shape[1]):
-                if Contour_flag == 0:
-                    points.append((x, y))
-                    print('point: ' + str(x) + ', ' + str(y), img[x, y])
-                    Contour_flag += 1
-                elif Contour_flag == 1:
-                    points.append((x, y))
-                    print('point: ' + str(x) + ', ' + str(y), img[x, y])
-                    Contour_flag += 1
-                else:
-                    return points'''
-
-
-def region_growing(img, seed):
+def RegionGrowing(image, seed):
     #Parameters for region growing
     neighbors = [(-1, 0),(-1,-1),(-1,1),(0,-1),(0,1),(1,0),(1,-1),(1,1)] 
     region_threshold =0.2
@@ -240,14 +224,14 @@ def region_growing(img, seed):
     neighbor_intensity_list = []
 
     #Mean of the segmented region
-    region_mean = img[seed]
+    region_mean = image[seed]
 
     #Input image parameters
-    height, width = img.shape
+    height, width = image.shape
     image_size = height * width
 
     #Initialize segmented output image
-    segmented_img = np.zeros((height, width, 1), np.uint8)
+    segmented_image = np.zeros((height, width, 1), np.uint8)
     
     #Region growing until intensity difference becomes greater than certain threshold
     while (intensity_difference < region_threshold) & (region_size < image_size):
@@ -260,18 +244,18 @@ def region_growing(img, seed):
             #Boundary Condition - check if the coordinates are inside the image
             check_inside = (x_new >= 0) & (y_new >= 0) & (x_new < height) & (y_new < width)
 
-            #Add neighbor if inside and not already in segmented_img
+            #Add neighbor if inside and not already in segmented_image
             if check_inside:
-                if segmented_img[x_new, y_new] == 0:
+                if segmented_image[x_new, y_new] == 0:
                     neighbor_points_list.append([x_new, y_new])
-                    neighbor_intensity_list.append(img[x_new, y_new])
-                    segmented_img[x_new, y_new] = 255
+                    neighbor_intensity_list.append(image[x_new, y_new])
+                    segmented_image[x_new, y_new] = 255
 
         #Add pixel with intensity nearest to the mean to the region
         distance = abs(neighbor_intensity_list-region_mean)
         pixel_distance = min(distance)
         index = np.where(distance == pixel_distance)[0][0]
-        segmented_img[seed[0], seed[1]] = 255
+        segmented_image[seed[0], seed[1]] = 255
         region_size += 1
 
         #New region mean
@@ -283,16 +267,10 @@ def region_growing(img, seed):
         neighbor_intensity_list[index] = neighbor_intensity_list[-1]
         neighbor_points_list[index] = neighbor_points_list[-1]
 
-    return segmented_img
+    return segmented_image
 
-def extract_feature_space(image, d):
-    '''
-    inputs:
-        image : the image itself
-        feature : intensity(1D), color(HS) (2D) or color(RGB)(3D)
-    outputs:
-        feature vector.
-    '''
+# Feature space extraction. It is just reshape operation
+def ExtractFeatureSpace(image, d):
     m, n = image.shape[0:2]
     hsv_image = colors.rgb_to_hsv(image)
     num_points = m*n
@@ -304,25 +282,17 @@ def extract_feature_space(image, d):
         im_space = image
     else:
         exit('Not supported feature')
-    # Feature space extraction. It is just reshape operation
     feature_vector = np.reshape(im_space, (num_points,d)).T
     return feature_vector
 
 
-def kmeans(image, k, num_iterations, d):
-    '''
-    inputs :
-    image
-    k : number of clusters
-    num_iterations :  number of iterations
-    d : dimension of feature space 1, 2, or 3D
-    '''
+def KMeans(image, k, num_iterations, d):
     #1. Construnct feature space
     m, n = image.shape[0:2]
     num_points = m*n
     #We will select H and S channels (color information)
     # We have 2D feature space
-    feature_space = extract_feature_space(image, d)
+    feature_space = ExtractFeatureSpace(image, d)
     # 2. Getting Initial centers
     idxs = np.round(num_points * np.random.rand(k))
     #Boundary condition
@@ -356,18 +326,11 @@ def kmeans(image, k, num_iterations, d):
             else:
                 idx =  np.round(num_points * np.random.rand())
                 clusters_centers[:,c] = feature_space[:,int(idx)]
-        segmented_image = extract_segmented_image(cluster_points, clusters_centers, image)
+        segmented_image = ExtractSegmentedImage(cluster_points, clusters_centers, image)
         return segmented_image
 
-def extract_segmented_image(clustering_out, clusters, image):
-    '''
-    inputs:
-        clustering_out: a 1D lookup table for each pixel cluster pair (size -> 1 x num_points)
-        clusters: a lookup table for cluster feature pair (size -> k x d) where
-        k is number of clusters and d is feature dimension
-    output:
-        segmented Image (in image domain)
-    '''
+def ExtractSegmentedImage(clustering_out, clusters, image):
+
     m, n = image.shape[0:2]
     d, k = clusters.shape[0:2]
     clusterd_feature_space = np.zeros((len(clustering_out),clusters.shape[0])).T
@@ -398,7 +361,7 @@ class Mainwindow(QMainWindow):
         
         self.pushButton_filters_load.clicked.connect(self.PB1)
         self.pushButton_circles_load.clicked.connect(self.load_Circles)
-        self.pushButton_histograms_load.clicked.connect(self.load_Histogram)
+        self.pushButton_Histograms_load.clicked.connect(self.LoadHistogram)
         self.pushButton_lines_load.clicked.connect(self.Line)
         self.pushButton_3.clicked.connect(self.Active_Contour)
         self.pushButton_5.clicked.connect(self.apply_snake)
@@ -427,17 +390,16 @@ class Mainwindow(QMainWindow):
         self.comboBox.addItems(["FFT High Pass"])
         self.label_21.setAlignment(Qt.AlignCenter)
         self.label_21.setMouseTracking(True)
-      #  self.label_21.mousePressEvent=self.on_mouse
        
         self.comboBox_2.addItems(["Region Growing"])     
-        self.comboBox_2.addItems(["Kmeans"])
+        self.comboBox_2.addItems(["KMeans"])
         self.comboBox_2.addItems(["Mean shift"])
         self.comboBox_2.activated.connect(self.Segmentation_selection)
         self.pushButton_2.clicked.connect(self.segmentation)
         self.pushButton_corners_load.clicked.connect(self.corners)
         self.radioButton.setChecked(False)
         self.radioButton_2.setChecked(False)
-        self.comboBox.activated.connect(self.filter_selection)
+        self.comboBox.activated.connect(self.FilterSelection)
        
         
 #_______________________________________________1st Tap______________________________________________                   
@@ -446,166 +408,162 @@ class Mainwindow(QMainWindow):
     def PB1(self):
         load(self)
         width, height = im.size
-        self.label.setText('Name: '+file_name)
+        self.label.setText('Name: '+fileName)
         self.label_2.setNum(width)
         self.label_12.setNum(height)
         self.graphicsView.clear()
-        self.graphicsView.setImage(np.transpose(image_gr))
+        self.graphicsView.setImage(np.transpose(grayScaleImage))
         
-    def filter_selection(self, text):
+    def FilterSelection(self, text):
         selection = self.comboBox.currentText()
         if selection == 'Prewitt':
            
-            Gx= ndimage.convolve(image_gr, prewitt_ker_Gx)
-            Gy = ndimage.convolve(image_gr, prewitt_ker_Gy)
+            Gx= ndimage.convolve(grayScaleImage, prewitt_ker_Gx)
+            Gy = ndimage.convolve(grayScaleImage, prewitt_ker_Gy)
             F=np.sqrt(Gx**2 + Gy**2)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(F))
 
         elif selection == 'Sobel':
-             Gx= ndimage.convolve(image_gr, Sobel_ker_Gx)
-             Gy = ndimage.convolve(image_gr,Sobel_ker_Gy)
+             Gx= ndimage.convolve(grayScaleImage, Sobel_ker_Gx)
+             Gy = ndimage.convolve(grayScaleImage,Sobel_ker_Gy)
              FilteredImage =np.sqrt(Gx**2 + Gy**2)
              self.graphicsView_2.clear()
              self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'Laplacian':
-            FilteredImage = ndimage.convolve(image_gr, Lablacian_ker)
+            FilteredImage = ndimage.convolve(grayScaleImage, Laplacian_ker)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'LOG':
-            FilteredImage = ndimage.gaussian_laplace(img, sigma=2)
+            FilteredImage = ndimage.gaussian_laplace(image, sigma=2)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'DOG':
              
-             Gaussian1 = ndimage.convolve(image_gr, gaussian_kernel(5, 1))
-             Gaussian2 = ndimage.convolve(image_gr, gaussian_kernel(5, 100))
+             Gaussian1 = ndimage.convolve(grayScaleImage, ApplyGaussianKernel(5, 1))
+             Gaussian2 = ndimage.convolve(grayScaleImage, ApplyGaussianKernel(5, 100))
              DoG = Gaussian2 - Gaussian1
              self.graphicsView_2.clear()
              self.graphicsView_2.setImage(np.transpose(DoG))
 
         elif selection == 'Box':
-            FilteredImage = ndimage.convolve(image_gr,  box_filter(3))
+            FilteredImage = ndimage.convolve(grayScaleImage,  ApplyBoxFilter(3))
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
             print('Your name: ' + self.line.text())
 
         elif selection == 'Gaussian':
-            FilteredImage = ndimage.convolve(image_gr, gauss_kernel(21, 5))
+            FilteredImage = ndimage.convolve(grayScaleImage, GuassKernel(21, 5))
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'Median':
-            FilteredImage = ndimage.median_filter(image_gr, (3, 3))
+            FilteredImage = ndimage.median_filter(grayScaleImage, (3, 3))
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'Sharpening':
-            FilteredImage = ndimage.convolve(image_gr, sharp_filter(5))
+            FilteredImage = ndimage.convolve(grayScaleImage, SharpeningFilter(5))
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(FilteredImage))
 
         elif selection == 'FFT':
             # extract value channel
-            valueChannel = extractValueChannel(img)
+            valueChannel = ExtractValueChannel(image)
             # Getting fourier transform for image
             FT = fftpack.fft2(valueChannel)
-            # plt.imshow(np.log(1+np.abs(FT)))
             ShiftedFT = fftpack.fftshift(FT)
-            print(73)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.log(1+np.abs(ShiftedFT)))
 
         elif selection == 'FFT Low Pass':
-            valueChannel = extractValueChannel(img)
+            valueChannel = ExtractValueChannel(image)
             # Getting fourier transform for image
             FT = fftpack.fft2(valueChannel)
-            # plt.imshow(np.log(1+np.abs(FT)))
             ShiftedFT = fftpack.fftshift(FT)
-            LPF = generateFilter(ShiftedFT, 0.05, 0.05, "LPF")
+            LPF = GenerateFilter(ShiftedFT, 0.05, 0.05, "LPF")
             # Apply Filter in Frequency Domain (blur)
             filteredVChannel = np.abs(fftpack.ifft2(LPF * ShiftedFT))
             # Covert Image to hsv
-            hsvImage = col.rgb_to_hsv(img)
+            hsvImage = col.rgb_to_hsv(image)
             filteredVChannel = filteredVChannel / np.max(filteredVChannel)
             # Add filtered value channel to hsv image
             hsvImage[..., 2] = filteredVChannel
             # Return Back to rgb color space
             finalImage = col.hsv_to_rgb(hsvImage)
-            finalImage = rgb2gray(finalImage)
+            finalImage = Rgb2Gray(finalImage)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(finalImage))
 
         elif selection == 'FFT High Pass':
-            valueChannel = extractValueChannel(img)
+            valueChannel = ExtractValueChannel(image)
             # Getting fourier transform for image
             FT = fftpack.fft2(valueChannel)
-            # plt.imshow(np.log(1+np.abs(FT)))
             ShiftedFT = fftpack.fftshift(FT)
-            HPF = generateFilter(ShiftedFT, 0.025, 0.025, "HPF")
+            HPF = GenerateFilter(ShiftedFT, 0.025, 0.025, "HPF")
             # Apply Filter in Frequency Domain (edge detection)
             filteredVChannel = np.abs(fftpack.ifft2(HPF * ShiftedFT))
             # Covert Image to hsv
-            hsvImage = col.rgb_to_hsv(img)
+            hsvImage = col.rgb_to_hsv(image)
             filteredVChannel = filteredVChannel / np.max(filteredVChannel)
             # Add filtered value channel to hsv image
             hsvImage[..., 2] = filteredVChannel
             # Return Back to rgb color space
             finalImage = col.hsv_to_rgb(hsvImage)
-            finalImage = rgb2gray(finalImage)
+            finalImage = Rgb2Gray(finalImage)
             self.graphicsView_2.clear()
             self.graphicsView_2.setImage(np.transpose(finalImage))
 
    
 #_______________________________________________5th Tap______________________________________________   
     @pyqtSlot()
-    def load_Histogram(self):
+    def LoadHistogram(self):
         load(self)
-        global image_gr, img, height, width,pixels  # Global to be moved or used between functions
-        img = image_gr
-        height = img.shape[0]
-        width = img.shape[1]
+        global grayScaleImage, image, height, width,pixels  # Global to be moved or used between functions
+        image = grayScaleImage
+        height = image.shape[0]
+        width = image.shape[1]
         pixels = width * height
-        hist,bins=np.histogram(img.ravel(),256,[0,256])
+        hist,bins=np.Histogram(image.ravel(),256,[0,256])
         self.graphicsView_5.clear()
-        self.graphicsView_5.setImage(np.transpose(img))
+        self.graphicsView_5.setImage(np.transpose(image))
         self.graphicsView_7.clear()
         self.graphicsView_7.plot(hist)
-        row, col = img.shape[:2]
-        self.label_11.setText('Name: ' + file_name)
+        row, col = image.shape[:2]
+        self.label_11.setText('Name: ' + fileName)
         self.label_16.setNum(row)
         self.label_17.setNum(col)
 
         if self.radioButton.isChecked() == True:
             print (self.radioButton.text() + " is selected")
-            eq = equalize_image(img)
+            eq = equalize_image(image)
             self.graphicsView_6.clear()
             self.graphicsView_6.setImage(np.transpose(eq))
-            hist,bins=np.histogram(eq.ravel(),256,[0,256])
+            hist,bins=np.Histogram(eq.ravel(),256,[0,256])
             self.graphicsView_8.clear()
             self.graphicsView_8.plot((hist))
 
         elif self.radioButton_2.isChecked() == True:
             self.radioButton.setChecked(False)
-            self.pushButton_histograms_load_target.clicked.connect(self.load_I) 
+            self.pushButton_Histograms_load_target.clicked.connect(self.load_I) 
                 
     @pyqtSlot()
     def load_I(self):
         load(self)
-        image = mpimg.imread('img1.jpg')  
-        img = rgb2gray(image)
-        img_ref= mpimg.imread(file_name)  
-        img_ref= rgb2gray(img_ref)
-        height_ref = img_ref.shape[0]
-        width_ref = img_ref.shape[1]
+        image = mpimage.imread('image1.jpg')  
+        image = Rgb2Gray(image)
+        image_ref= mpimage.imread(fileName)  
+        image_ref= Rgb2Gray(image_ref)
+        height_ref = image_ref.shape[0]
+        width_ref = image_ref.shape[1]
         pixels_ref = width_ref * height_ref
-        hist =histogram(img)
-        hist_ref =histogram(img_ref)
-        cum_hist = cumulative_histogram(hist)
-        cum_hist_ref = cumulative_histogram(hist_ref)
+        hist =Histogram(image)
+        hist_ref =Histogram(image_ref)
+        cum_hist = ApplyCumulativeHistogram(hist)
+        cum_hist_ref = ApplyCumulativeHistogram(hist_ref)
         prob_cum_hist = cum_hist / pixels
         prob_cum_hist_ref = cum_hist_ref / pixels_ref
 
@@ -622,45 +580,45 @@ class Mainwindow(QMainWindow):
 
         for i in np.arange(height):
          for j in np.arange(width):
-            a = img.item(i,j)  #current pixel value
+            a = image.item(i,j)  #current pixel value
             b = new_values[int(a)]  
-            img.itemset((i,j), b)
+            image.itemset((i,j), b)
 
 
         self.graphicsView_6.clear()
-        self.graphicsView_6.setImage(np.transpose(img))
-        hist, bins=np.histogram(img.ravel(),256,[0,256])
+        self.graphicsView_6.setImage(np.transpose(image))
+        hist, bins=np.Histogram(image.ravel(),256,[0,256])
       
 
 #_______________________________________________2nd Tap______________________________________________    
     def Line(self):
         
         load(self)
-        image = cv2.imread(file_name)
-        img = rgb2gray(image)
-        height = img.shape[0]
-        width = img.shape[1]
-        self.label_4.setText('Name: ' + file_name)
+        image = cv2.imread(fileName)
+        image = Rgb2Gray(image)
+        height = image.shape[0]
+        width = image.shape[1]
+        self.label_4.setText('Name: ' + fileName)
         self.label_18.setNum(width)
         self.label_19.setNum(height)
         self.graphicsView_9.clear()
-        self.graphicsView_9.setImage(np.transpose(img))
+        self.graphicsView_9.setImage(np.transpose(image))
 
-        def gaussian_kernel(size, sigma=1):
+        def ApplyGaussianKernel(size, sigma=1):
             size = int(size) // 2
             x, y = np.mgrid[-size:size + 1, -size:size + 1]
             normal = 1 / (2.0 * np.pi * sigma ** 2)
             g = np.exp(-((x ** 2 + y ** 2) / (2.0 * sigma ** 2))) * normal
             return g
 
-        Gaussian = convolve(img, gaussian_kernel(5, 1))
+        Gaussian = convolve(image, ApplyGaussianKernel(5, 1))
 
-        def sobel_filters(img):
+        def sobel_filters(image):
             Kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
             Ky = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], np.float32)
 
-            Ix = ndimage.filters.convolve(img, Kx)
-            Iy = ndimage.filters.convolve(img, Ky)
+            Ix = ndimage.filters.convolve(image, Kx)
+            Iy = ndimage.filters.convolve(image, Ky)
 
             G = np.hypot(Ix, Iy)
             G = G / G.max() * 255
@@ -671,8 +629,8 @@ class Mainwindow(QMainWindow):
 
         # plt.imshow(gradientMat)
 
-        def non_max_suppression(img, D):
-            M, N = img.shape
+        def non_max_suppression(image, D):
+            M, N = image.shape
             Z = np.zeros((M, N), dtype=np.int32)
             angle = D * 180. / np.pi
             angle[angle < 0] += 180
@@ -685,23 +643,23 @@ class Mainwindow(QMainWindow):
 
                         # angle 0
                         if (0 <= angle[i, j] < 22.5) or (157.5 <= angle[i, j] <= 180):
-                            q = img[i, j + 1]
-                            r = img[i, j - 1]
+                            q = image[i, j + 1]
+                            r = image[i, j - 1]
                         # angle 45
                         elif (22.5 <= angle[i, j] < 67.5):
-                            q = img[i + 1, j - 1]
-                            r = img[i - 1, j + 1]
+                            q = image[i + 1, j - 1]
+                            r = image[i - 1, j + 1]
                         # angle 90
                         elif (67.5 <= angle[i, j] < 112.5):
-                            q = img[i + 1, j]
-                            r = img[i - 1, j]
+                            q = image[i + 1, j]
+                            r = image[i - 1, j]
                         # angle 135
                         elif (112.5 <= angle[i, j] < 157.5):
-                            q = img[i - 1, j - 1]
-                            r = img[i + 1, j + 1]
+                            q = image[i - 1, j - 1]
+                            r = image[i + 1, j + 1]
 
-                        if (img[i, j] >= q) and (img[i, j] >= r):
-                            Z[i, j] = img[i, j]
+                        if (image[i, j] >= q) and (image[i, j] >= r):
+                            Z[i, j] = image[i, j]
                         else:
                             Z[i, j] = 0
 
@@ -710,58 +668,58 @@ class Mainwindow(QMainWindow):
 
             return Z
 
-        nonMaxImg = non_max_suppression(gradientMat, thetaMat)
+        nonMaximage = non_max_suppression(gradientMat, thetaMat)
 
-        # plt.imshow(nonMaxImg)
+        # plt.imshow(nonMaximage)
 
-        def threshold(img, lowThresholdRatio=0.05, highThresholdRatio=0.09):
+        def threshold(image, lowThresholdRatio=0.05, highThresholdRatio=0.09):
 
-            highThreshold = img.max() * highThresholdRatio;
+            highThreshold = image.max() * highThresholdRatio;
             lowThreshold = highThreshold * lowThresholdRatio;
 
-            M, N = img.shape
+            M, N = image.shape
             res = np.zeros((M, N), dtype=np.int32)
 
             weak = np.int32(25)
             strong = np.int32(255)
 
-            strong_i, strong_j = np.where(img >= highThreshold)
-            zeros_i, zeros_j = np.where(img < lowThreshold)
+            strong_i, strong_j = np.where(image >= highThreshold)
+            zeros_i, zeros_j = np.where(image < lowThreshold)
 
-            weak_i, weak_j = np.where((img <= highThreshold) & (img >= lowThreshold))
+            weak_i, weak_j = np.where((image <= highThreshold) & (image >= lowThreshold))
 
             res[strong_i, strong_j] = strong
             res[weak_i, weak_j] = weak
 
             return (res, weak, strong)
 
-        thresholdImg, weak, strong = threshold(nonMaxImg)
+        thresholdimage, weak, strong = threshold(nonMaximage)
 
-        # plt.imshow(thresholdImg)
+        # plt.imshow(thresholdimage)
 
-        def hysteresis(img, weak, strong):
-            M, N = img.shape
+        def hysteresis(image, weak, strong):
+            M, N = image.shape
             weak = np.int32(25)
             strong = np.int32(255)
             for i in range(1, M - 1):
                 for j in range(1, N - 1):
-                    if (img[i, j] == weak):
+                    if (image[i, j] == weak):
                         try:
-                            if ((img[i + 1, j - 1] == strong) or (img[i + 1, j] == strong) or (
-                                    img[i + 1, j + 1] == strong)
-                                    or (img[i, j - 1] == strong) or (img[i, j + 1] == strong)
-                                    or (img[i - 1, j - 1] == strong) or (img[i - 1, j] == strong) or (
-                                            img[i - 1, j + 1] == strong)):
-                                img[i, j] = strong
+                            if ((image[i + 1, j - 1] == strong) or (image[i + 1, j] == strong) or (
+                                    image[i + 1, j + 1] == strong)
+                                    or (image[i, j - 1] == strong) or (image[i, j + 1] == strong)
+                                    or (image[i - 1, j - 1] == strong) or (image[i - 1, j] == strong) or (
+                                            image[i - 1, j + 1] == strong)):
+                                image[i, j] = strong
                             else:
-                                img[i, j] = 0
+                                image[i, j] = 0
                         except IndexError as e:
                             pass
-            return img
+            return image
 
-        edge = hysteresis(thresholdImg, weak, strong)
+        edge = hysteresis(thresholdimage, weak, strong)
 
-        # plt.imshow(img_final)
+        # plt.imshow(image_final)
 
         def houghLine(edge):
 
@@ -820,9 +778,9 @@ class Mainwindow(QMainWindow):
             plt.xlim(0, width)
             plt.ylim(height, 0)
             
-            figure.savefig('imgLine.png')
+            figure.savefig('imageLine.png')
         detectLines(image, accumulator, thetas, rhos, 0.8)
-        self.label_lines_input_2.setPixmap(QPixmap('imgLine.png').
+        self.label_lines_input_2.setPixmap(QPixmap('imageLine.png').
                                            scaled(self.label_lines_input_2.width(), self.label_lines_input_2.height()))
         self.graphicsView_10.clear()
         self.graphicsView_10.setImage((accumulator))
@@ -830,11 +788,11 @@ class Mainwindow(QMainWindow):
     @pyqtSlot()
     def load_Circles(self):
         load(self)
-        input_image = Image.open(file_name)
+        input_image = Image.open(fileName)
         # Output image:
         output_image = Image.new("RGB", input_image.size)
         self.graphicsView_3.clear()
-        self.graphicsView_3.setImage(np.transpose(image_gr))
+        self.graphicsView_3.setImage(np.transpose(grayScaleImage))
        
         from collections import defaultdict
         output_image.paste(input_image)
@@ -878,7 +836,7 @@ class Mainwindow(QMainWindow):
     def segmentation(self):
         load(self)
         width, height = im.size
-        image=(file_name)
+        image=(fileName)
         pixmap = QPixmap(image)
         self.label_21.setPixmap(pixmap)
         self.label_21.setPixmap(QPixmap(pixmap).
@@ -893,15 +851,15 @@ class Mainwindow(QMainWindow):
         if selection == 'Region Growing':
                 print("Right button clicked")  
                 
-                image = ndimage.imread(file_name)
-                image = rgb2gray(image)
-                ret, img = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)
+                image = ndimage.imread(fileName)
+                image = Rgb2Gray(image)
+                ret, image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)
                 cv2.namedWindow('Input')
                 cv2.setMouseCallback('Input', on_mouse, 0, )
-                cv2.imshow('Input', img)
+                cv2.imshow('Input', image)
                 cv2.waitKey()        
                 seed = clicks[-1]  
-                out = region_growing(img, seed)
+                out = RegionGrowing(image, seed)
                
                 #cv2.imshow('Region Growing', out)
                 print(5)
@@ -912,22 +870,22 @@ class Mainwindow(QMainWindow):
                 figure.savefig('k.png')
                 self.label_23.setPixmap(QPixmap('k.png').
                                            scaled(self.label_23.width(), self.label_23.height()))
-                #figure.savefig('imgLine.png')
+                #figure.savefig('imageLine.png')
             
-                 ##self.label_lines_input_2.setPixmap(QPixmap('imgLine.png').
+                 ##self.label_lines_input_2.setPixmap(QPixmap('imageLine.png').
                                           #$# scaled(self.label_lines_input_2.width(), self.label_lines_input_2.height()))
                # image=(out)
                # pixmap = QPixmap(image)
               #  self.label_label_47.setPixmap(pixmap)
-        if selection == 'Kmeans':
-                 image = plt.imread(file_name)
+        if selection == 'KMeans':
+                 image = plt.imread(fileName)
                  # Rescale image down for speedup
                  image = misc.imresize(image, (150,150))
                  #Show original Image
                  plt.figure('Original Image')
                  plt.imshow(image)
                  #Apply k means segmentation and show the result
-                 segmented_image = kmeans(image, 5,10, 1)
+                 segmented_image = KMeans(image, 5,10, 1)
                  plt.figure('segmented image 1D')
                  plt.set_cmap('gray')
                  plt.imshow(segmented_image)
@@ -935,17 +893,17 @@ class Mainwindow(QMainWindow):
                  #plt.show()
 
                  ####2D
-                 segmented_image = kmeans(image, 5, 10, 2)
+                 segmented_image = KMeans(image, 5, 10, 2)
                  plt.figure('segmented image 2D')
                  plt.set_cmap('gray')
                  figure = plt.figure()
                  plt.imshow(segmented_image)
-                 figure.savefig('Kmeans.png')
-                 self.label_23.setPixmap(QPixmap('Kmeans.png').
+                 figure.savefig('KMeans.png')
+                 self.label_23.setPixmap(QPixmap('KMeans.png').
                                            scaled(self.label_23.width(), self.label_23.height()))
         if selection == 'Mean shift':
              
-             K = ndimage.imread(file_name)
+             K = ndimage.imread(fileName)
              row=K.shape[0]
              col=K.shape[1]
              J= row * col
@@ -1066,18 +1024,18 @@ class Mainwindow(QMainWindow):
 #_______________________________________________4th Tap______________________________________________        
     def corners(self):
                   load(self)
-                  image=(file_name)
+                  image=(fileName)
                   pixmap = QPixmap(image)
                   self.label_corners_corners.setPixmap(pixmap)
                   self.label_corners_corners.setPixmap(QPixmap(image).
                                            scaled(self.label_corners_corners.width(), self.label_corners_corners.height()))
-                  image = ndimage.imread(file_name)
-                  img = rgb2gray(image)
+                  image = ndimage.imread(fileName)
+                  image = Rgb2Gray(image)
                   width, height = im.size
-                  self.label_8.setText("Name: " +file_name)
+                  self.label_8.setText("Name: " +fileName)
                   self.label_25.setNum(width)
                   self.label_26.setNum(width)
-                  Gaussian= signal.convolve2d(img, gaussian_kernel(7,1.0) ,'same')
+                  Gaussian= signal.convolve2d(image, ApplyGaussianKernel(7,1.0) ,'same')
                   plt.imshow(Gaussian)
                   kx = np.array([[-1, 0, 1],[-2, 0, 2],[-1, 0, 1]])
                   ky = np.array([[1, 2, 1],[0, 0, 0],[-1, -2, -1]])
@@ -1086,9 +1044,9 @@ class Mainwindow(QMainWindow):
                   Ixx =  np.multiply( I_x, I_x) 
                   Iyy =  np.multiply( I_y, I_y)
                   Ixy =  np.multiply( I_x, I_y)
-                  Ixx_hat = signal.convolve2d( Ixx ,box_filter( 3 ) ,'same') 
-                  Iyy_hat = signal.convolve2d( Iyy , box_filter( 3) ,'same') 
-                  Ixy_hat = signal.convolve2d( Ixy , box_filter( 3 ) ,'same')
+                  Ixx_hat = signal.convolve2d( Ixx ,ApplyBoxFilter( 3 ) ,'same') 
+                  Iyy_hat = signal.convolve2d( Iyy , ApplyBoxFilter( 3) ,'same') 
+                  Ixy_hat = signal.convolve2d( Ixy , ApplyBoxFilter( 3 ) ,'same')
                   K = 0.05
                   detM = np.multiply(Ixx_hat,Iyy_hat) - np.multiply(Ixy_hat,Ixy_hat) 
                   trM = Ixx_hat + Iyy_hat
@@ -1109,15 +1067,15 @@ class Mainwindow(QMainWindow):
     def Active_Contour(self):
         load(self)
 
-        #input_image = Image.open(file_name)
+        #input_image = Image.open(fileName)
         # PLOT THE IMAGE INTO UI
-        #image = rgb2gray(input_image)
+        #image = Rgb2Gray(input_image)
         #image2 = skimage.filters.gaussian(image, 6.0)
 
-        image = ndimage.imread(file_name)
-        image = rgb2gray(image)
-        img = skimage.filters.gaussian(image, 6.0)
-        self.label_27.setPixmap(QPixmap(img).scaled(self.label_corners_corners_output.width(), self.label_corners_corners_output.height()))
+        image = ndimage.imread(fileName)
+        image = Rgb2Gray(image)
+        image = skimage.filters.gaussian(image, 6.0)
+        self.label_27.setPixmap(QPixmap(image).scaled(self.label_corners_corners_output.width(), self.label_corners_corners_output.height()))
 
         #SNAKE ALGORITHM
         def Snake(image, initialContour, edgeImage=None, alpha=0.01, beta=0.1, wLine=0, wEdge=1, gamma=0.01,
@@ -1135,7 +1093,7 @@ class Mainwindow(QMainWindow):
             #     raise ValueError("Invalid boundary condition.\n" +
             #                      "Should be one of: " + ", ".join(valid_bcs) + '.')
 
-            image = skimage.img_as_float(image)
+            image = skimage.image_as_float(image)
             isMultiChannel = image.ndim == 3
 
             # If edge image is not given and an edge weight is specified, then get the edge of image using sobel mask
@@ -1247,10 +1205,10 @@ class Mainwindow(QMainWindow):
         # once we have the contour points in array we can put it in snake function
         '''cv2.namedWindow('Input')
         cv2.setMouseCallback('Input', contour_draw, 0, )
-        cv2.imshow('Input', img)
+        cv2.imshow('Input', image)
         cv2.waitKey()'''
         global snakeContour
-        snakeContour = Snake(img, contour, wEdge=1.0, alpha=0.5, beta=10, gamma=0.001, maxIterations=500,
+        snakeContour = Snake(image, contour, wEdge=1.0, alpha=0.5, beta=10, gamma=0.001, maxIterations=500,
                                  maxPixelMove=1.0, convergence=0.1)
 
     def apply_snake(self):
