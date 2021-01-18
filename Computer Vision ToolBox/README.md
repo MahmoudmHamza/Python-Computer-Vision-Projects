@@ -1,11 +1,12 @@
 # Computer Vision Toolbox
 
+> **NOTE**
+
+This project was part of a classwork during the whole course so Ii'm totally aware that it's neither written in a clean way nor following Python best practices.
+
 ## Overview
 
-this report includes the summary of image processing filters implemented using python 3.6 such as
-- Spatial domain filtering
-- Frequency domain filtering
-- Hough Transform
+This toolbox includes image processing filters implemented using python 3.6.
 
 The tool box's UI (User Interface) was implemented using PyQt5 library.
 
